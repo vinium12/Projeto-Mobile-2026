@@ -3,7 +3,7 @@ import { AlertProps } from "./types";
 
 import { View, Text, TouchableOpacity, Modal, Animated, Platform, StyleSheet } from 'react-native';
 
-import { Colors } from '@/constants/colors';
+import { Colors } from '../../constants/colors';
 
 const AlertWeb: React.FC<AlertProps> = ({ title, message, visible, onClose, type = 'info'  }) => {
     const fadeAnim = React.useRef(new Animated.Value(0)).current;

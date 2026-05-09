@@ -35,5 +35,25 @@ export const Colors = {
         100: '#F2F2F2',
         500: '#999999',
         800: '#333333',
+    },
+
+    pokemonTypes: {
+        'Fogo':     '#FF6B35',
+        'Água':     '#4FC3F7',
+        'Planta':   '#66BB6A',
+        'Veneno':   '#AB47BC',
+        'Elétrico': '#FFCA28',
+        'Normal':   '#BDBDBD',
+        'Psíquico': '#EC407A',
+        'Gelo':     '#80DEEA',
+        'Dragão':   '#5E35B1',
+        'Lutador':  '#FF7043',
+        'Voador':   '#90CAF9',
+        'Inseto':   '#D4E157',
+        'Pedra':    '#A1887F',
+        'Fantasma': '#7E57C2',
+        'Terra':    '#FFCC02',
+        'Fada':     '#F48FB1',
     }
+
 } as const;
