@@ -1,19 +1,12 @@
-import { Image, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Image, StatusBar, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
 import { Button } from '../../components/button';
 import { List } from '../../components/list/index.android';
 import { Colors } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
-
-
-const pokemons = [
-    { id: '1',   title: 'Bulbasaur',  types: ['Planta', 'Veneno'], image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png' },
-    { id: '4',   title: 'Charmander', types: ['Fogo'],             image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png' },
-    { id: '7',   title: 'Squirtle',   types: ['Água'],             image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png' },
-    { id: '25',  title: 'Pikachu',    types: ['Elétrico'],         image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png' },
-    { id: '39',  title: 'Jigglypuff', types: ['Normal', 'Fada'],   image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/39.png' },
-    { id: '52',  title: 'Meowth',     types: ['Normal'],           image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/52.png' },
-    { id: '122', title: 'Mr. Mime',   types: ['Psíquico', 'Fada'], image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/122.png' },
-];
+import { getPokemons } from '../../integration/pokemonIntegration';
+import { TYPE_MAP } from '../../constants/pokemon';
+import { Pokemon } from '../../@types/pokemon';
 
 function TypeBadge({ label }: { label: string }) {
   const color = Colors.pokemonTypes[label as keyof typeof Colors.pokemonTypes] ?? '#BDBDBD';
@@ -24,8 +17,62 @@ function TypeBadge({ label }: { label: string }) {
   );
 }
 
+interface PokemonItem {
+  id: string;
+  title: string;
+  types: string[];
+  image: string;
+}
+
 export default function Dashboard() {
   const { user, signOut } = useAuth();
+  const [pokemons, setPokemons] = useState<PokemonItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPokemons = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getPokemons(151);
+        
+        // Mapear dados da API para o formato esperado
+        const mappedData: PokemonItem[] = data.map((pokemon: Pokemon) => ({
+          id: pokemon.index,
+          title: pokemon.nome.charAt(0).toUpperCase() + pokemon.nome.slice(1),
+          types: pokemon.tipos.map(tipo => TYPE_MAP[tipo] || tipo),
+          image: pokemon.imagem,
+        }));
+        
+        setPokemons(mappedData);
+      } catch (err) {
+        setError('Erro ao carregar pokémons');
+        console.error('Erro ao carregar pokémons:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPokemons();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={[styles.root, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.root, styles.centerContent]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Button title="Tentar Novamente" onPress={() => window.location.reload?.()} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -75,6 +122,10 @@ export const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#CC0000',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     paddingTop: 52,
@@ -153,6 +204,11 @@ export const styles = StyleSheet.create({
     fontSize: 24,
     color: '#CCCCCC',
     marginLeft: 8,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 20,
   },
   footer: {
     backgroundColor: '#F5F5F0',

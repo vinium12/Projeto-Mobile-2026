@@ -1,18 +1,12 @@
-import { Image, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Image, StatusBar, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
 import { Button } from '../../components/button';
 import { List } from '../../components/list/index.web';
 import { Colors } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
-
-const pokemons = [
-    { id: '1',   title: 'Bulbasaur',  types: ['Planta', 'Veneno'], image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png' },
-    { id: '4',   title: 'Charmander', types: ['Fogo'],             image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png' },
-    { id: '7',   title: 'Squirtle',   types: ['Água'],             image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png' },
-    { id: '25',  title: 'Pikachu',    types: ['Elétrico'],         image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png' },
-    { id: '39',  title: 'Jigglypuff', types: ['Normal', 'Fada'],   image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/39.png' },
-    { id: '52',  title: 'Meowth',     types: ['Normal'],           image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/52.png' },
-    { id: '122', title: 'Mr. Mime',   types: ['Psíquico', 'Fada'], image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/122.png' },
-];
+import { getPokemons } from '../../integration/pokemonIntegration';
+import { TYPE_MAP } from '../../constants/pokemon';
+import { Pokemon } from '../../@types/pokemon';
 
 function TypeBadge({ label }: { label: string }) {
   const color = Colors.pokemonTypes[label as keyof typeof Colors.pokemonTypes] ?? '#BDBDBD';
@@ -23,8 +17,62 @@ function TypeBadge({ label }: { label: string }) {
   );
 }
 
+interface PokemonItem {
+  id: string;
+  title: string;
+  types: string[];
+  image: string;
+}
+
 export default function Dashboard() {
   const { user, signOut } = useAuth();
+  const [pokemons, setPokemons] = useState<PokemonItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPokemons = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getPokemons(151);
+        
+        // Mapear dados da API para o formato esperado
+        const mappedData: PokemonItem[] = data.map((pokemon: Pokemon) => ({
+          id: pokemon.index,
+          title: pokemon.nome.charAt(0).toUpperCase() + pokemon.nome.slice(1),
+          types: pokemon.tipos.map(tipo => TYPE_MAP[tipo] || tipo),
+          image: pokemon.imagem,
+        }));
+        
+        setPokemons(mappedData);
+      } catch (err) {
+        setError('Erro ao carregar pokémons');
+        console.error('Erro ao carregar pokémons:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPokemons();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={[styles.root, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.root, styles.centerContent]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Button title="Tentar Novamente" onPress={() => window.location.reload?.()} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -72,6 +120,10 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#CC0000',
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     paddingTop: 52,
     paddingHorizontal: 20,
@@ -99,37 +151,40 @@ export const styles = StyleSheet.create({
     elevation: 3,
     borderTopWidth: 4,
     borderTopColor: '#CC0000',
-    height: '100%',
-},
-imageWrapper: {
-    width: '100%',
-    aspectRatio: 1.4,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-},
-  pokemonImage: {
-    width: '80%',
-    height: '80%',
   },
   cardNumber: {
     fontSize: 11,
     color: '#AAAAAA',
     fontWeight: '600',
-    marginBottom: 2,
+    marginTop: 8,
+  },
+  imageWrapper: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pokemonImage: {
+    width: 80,
+    height: 80,
+  },
+  cardInfo: {
+    flex: 1,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: 'bold',
     color: '#222',
-    marginBottom: 6,
+    marginTop: 8,
+    textAlign: 'center',
   },
   typesRow: {
     flexDirection: 'row',
     gap: 4,
     flexWrap: 'wrap',
+    marginTop: 8,
     justifyContent: 'center',
   },
   badge: {
@@ -139,7 +194,7 @@ imageWrapper: {
     paddingVertical: 2,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   footer: {
@@ -147,5 +202,10 @@ imageWrapper: {
     paddingHorizontal: 16,
     paddingBottom: 24,
     paddingTop: 8,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 20,
   },
 });

@@ -27,7 +27,7 @@ export default function Index() {
             router.push({ pathname: '/dashboard', params: { username: name } });
         } else {
             setAlertData({
-                title: 'Erro de Login',
+                title: 'Erro de       ',
                 message: 'Credenciais inválidas. Tente novamente.',
                 type: 'error',
             });
