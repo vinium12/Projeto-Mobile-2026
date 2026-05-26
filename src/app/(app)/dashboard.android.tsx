@@ -30,15 +30,48 @@ function TypeBadge({ label }: { label: string }) {
   );
 }
 
+interface Poder {
+  nome: string;
+  forca: number;
+}
+
 interface PokemonItem {
   id: string;
   title: string;
   types: string[];
   image: string;
+  poderes: Poder[];
+}
+
+function StatBar({ nome, valor }: { nome: string; valor: number }) {
+  const maxValue = 255;
+  const percentage = (valor / maxValue) * 100;
+  
+  const getColor = () => {
+    if (percentage > 75) return '#4CAF50';
+    if (percentage > 50) return '#FFC107';
+    if (percentage > 25) return '#FF9800';
+    return '#F44336';
+  };
+
+  return (
+    <View style={styles.statContainer}>
+      <Text style={styles.statName}>{nome}</Text>
+      <View style={styles.statBarBackground}>
+        <View
+          style={[
+            styles.statBarFill,
+            { flex: percentage / 100, backgroundColor: getColor() },
+          ]}
+        />
+      </View>
+      <Text style={styles.statValue}>{valor}</Text>
+    </View>
+  );
 }
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [pokemons, setPokemons] = useState<PokemonItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +89,7 @@ export default function Dashboard() {
           title: pokemon.nome.charAt(0).toUpperCase() + pokemon.nome.slice(1),
           types: pokemon.tipos.map((tipo) => TYPE_MAP[tipo] || tipo),
           image: pokemon.imagem,
+          poderes: pokemon.poderes,
         }));
 
         setPokemons(mappedData);
@@ -123,16 +157,21 @@ export default function Dashboard() {
                     <TypeBadge key={type} label={type} />
                   ))}
                 </View>
+                <View style={styles.statsContainer}>
+                  {item.poderes.slice(0, 4).map((poder) => (
+                    <StatBar
+                      key={poder.nome}
+                      nome={poder.nome.substring(0, 3).toUpperCase()}
+                      valor={poder.forca}
+                    />
+                  ))}
+                </View>
               </View>
 
               <Text style={styles.arrow}>›</Text>
             </View>
           )}
         />
-      </View>
-
-      <View style={styles.footer}>
-        <Button title="Sair da Pokédex" onPress={signOut} />
       </View>
     </View>
   );
@@ -230,10 +269,37 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
   },
-  footer: {
-    backgroundColor: "#F5F5F0",
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-    paddingTop: 8,
+  statsContainer: {
+    marginTop: 8,
+    gap: 4,
+  },
+  statContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statName: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#666",
+    minWidth: 28,
+  },
+  statBarBackground: {
+    flex: 1,
+    height: 6,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  statBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  statValue: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#333",
+    minWidth: 28,
+    textAlign: "right",
   },
 });
