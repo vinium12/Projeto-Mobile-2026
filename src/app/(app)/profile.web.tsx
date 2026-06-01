@@ -9,6 +9,58 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
+export default function ProfileScreen() {
+    const { userProfile } = useAuth();
+
+    if (!userProfile) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.name}>Carregando...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                <View style={styles.header}>
+                    <Image
+                        source={userProfile.image}
+                        style={styles.avatar}
+                    />
+                    <Text style={styles.name}>{userProfile.name}</Text>
+                </View>
+
+                <View style={styles.boardContainer}>
+                    <Text style={styles.boardTitle}>Estatísticas</Text>
+                    
+                    <View style={styles.statsGrid}>
+                        <View style={styles.statCard}>
+                            <Text style={styles.statValue}>{userProfile.victories}</Text>
+                            <Text style={styles.statLabel}>Vitórias</Text>
+                        </View>
+
+                        <View style={styles.statCard}>
+                            <Text style={styles.statValue}>{userProfile.defeats}</Text>
+                            <Text style={styles.statLabel}>Derrotas</Text>
+                        </View>
+
+                        <View style={styles.statCard}>
+                            <Text style={styles.statValue}>{userProfile.matches}</Text>
+                            <Text style={styles.statLabel}>Partidas</Text>
+                        </View>
+                    </View>
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
+}
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -84,55 +136,3 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 });
-
-export default function ProfileScreen() {
-    const { userProfile } = useAuth();
-
-    if (!userProfile) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.name}>Carregando...</Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-            >
-                <View style={styles.header}>
-                    <Image
-                        source={userProfile.image}
-                        style={styles.avatar}
-                    />
-                    <Text style={styles.name}>{userProfile.name}</Text>
-                </View>
-
-                <View style={styles.boardContainer}>
-                    <Text style={styles.boardTitle}>Estatísticas</Text>
-                    
-                    <View style={styles.statsGrid}>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{userProfile.victories}</Text>
-                            <Text style={styles.statLabel}>Vitórias</Text>
-                        </View>
-
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{userProfile.defeats}</Text>
-                            <Text style={styles.statLabel}>Derrotas</Text>
-                        </View>
-
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{userProfile.matches}</Text>
-                            <Text style={styles.statLabel}>Partidas</Text>
-                        </View>
-                    </View>
-                </View>
-            </ScrollView>
-        </SafeAreaView>
-    );
-}

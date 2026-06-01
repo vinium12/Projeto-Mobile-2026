@@ -48,7 +48,7 @@ function StatBar({ nome, valor }: { nome: string; valor: number }) {
         <View
           style={[
             styles.statBarFill,
-            { flex: percentage / 100, backgroundColor: getColor() },
+            { width: `${percentage}%`, backgroundColor: getColor() },
           ]}
         />
       </View>
@@ -187,8 +187,6 @@ export const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     elevation: 3,
-    borderTopWidth: 4,
-    borderTopColor: '#CC0000',
   },
   cardNumber: {
     fontSize: 11,
@@ -259,6 +257,7 @@ export const styles = StyleSheet.create({
   statBarBackground: {
     flex: 1,
     height: 6,
+    flexDirection: 'row',
     backgroundColor: '#E0E0E0',
     borderRadius: 3,
     overflow: 'hidden',
