@@ -49,6 +49,7 @@ export default function Index() {
                         <Input placeholder="Usuário" onChangeText={setName} />
                         <Input placeholder="Senha" secureTextEntry onChangeText={setSenha} />
                         <Button title="Entrar" onPress={validateCredentials} style={{ marginTop: 8 }} />
+                        <Text style={styles.register}>Não tem senha? Cadastre-se</Text> 
                     </View>
                 </Card>
             </View>
@@ -106,4 +107,10 @@ const styles = StyleSheet.create({
         gap: 12,
         width: 360,
     },
+    register:{
+        color: '#CC0000',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        textDecorationLine: 'underline'
+    }
 });
