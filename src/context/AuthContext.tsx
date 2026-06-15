@@ -1,4 +1,3 @@
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -24,25 +23,13 @@ type AuthContextData = {
     user: string | null;
     userProfile: UserProfile | null;
     isLoading: boolean;
-    signIn: (username: string) => void;
+    signIn: (username: string, userId: string) => Promise<void>;
     signOut: () => void;
     addToTeam: (pokemon: TeamPokemon) => void;
     removeFromTeam: (pokemonId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
-
-const mockProfiles: Record<string, UserProfile> = {
-    kleber: {
-        id: '1',
-        name: 'Kleber',
-        image: require('../../assets/images/Madruga.jpg'),
-        victories: 12,
-        defeats: 5,
-        matches: 17,
-        team: [],
-    }
-};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -52,29 +39,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         async function loadStorageData() {
-            const storageUser = await AsyncStorage.getItem('@Auth:user')
-            const storageTeam = await AsyncStorage.getItem('@Auth:team')
+            const storageUser = await AsyncStorage.getItem('@Auth:user');
+            const storageUserId = await AsyncStorage.getItem('@Auth:userId');
+            const storageTeam = await AsyncStorage.getItem('@Auth:team');
 
-            if(storageUser) {
-                const profile = mockProfiles[storageUser];
-                if(profile && storageTeam) {
-                    profile.team = JSON.parse(storageTeam);
-                }
+            if (storageUser && storageUserId) {
+                const team = storageTeam ? JSON.parse(storageTeam) : [];
                 setUser(storageUser);
-                setUserProfile(profile || null);
+                setUserProfile({
+                    id: storageUserId,
+                    name: storageUser,
+                    image: null,
+                    victories: 0,
+                    defeats: 0,
+                    matches: 0,
+                    team,
+                });
                 setIsAuthenticated(true);
             }
             setIsLoading(false);
         }
         loadStorageData();
     }, []);
-    
-    async function signIn(username: string) {
-        const profile = mockProfiles[username];
+
+    async function signIn(username: string, userId: string) {
         setUser(username);
-        setUserProfile(profile || null);
+        setUserProfile({
+            id: userId,
+            name: username,
+            image: null,
+            victories: 0,
+            defeats: 0,
+            matches: 0,
+            team: [],
+        });
         setIsAuthenticated(true);
         await AsyncStorage.setItem('@Auth:user', username);
+        await AsyncStorage.setItem('@Auth:userId', userId);
     }
 
     async function signOut() {
@@ -82,14 +83,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUserProfile(null);
         setIsAuthenticated(false);
         await AsyncStorage.removeItem('@Auth:user');
+        await AsyncStorage.removeItem('@Auth:userId');
         await AsyncStorage.removeItem('@Auth:team');
     }
 
     async function addToTeam(pokemon: TeamPokemon) {
-        if(userProfile && userProfile.team.length < 5) {
+        if (userProfile && userProfile.team.length < 5) {
             const updatedProfile = {
                 ...userProfile,
-                team: [...userProfile.team, pokemon]
+                team: [...userProfile.team, pokemon],
             };
             setUserProfile(updatedProfile);
             await AsyncStorage.setItem('@Auth:team', JSON.stringify(updatedProfile.team));
@@ -97,11 +99,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     async function removeFromTeam(pokemonId: string) {
-        if(userProfile) {
+        if (userProfile) {
             const updatedTeam = userProfile.team.filter(p => p.id !== pokemonId);
             const updatedProfile = {
                 ...userProfile,
-                team: updatedTeam
+                team: updatedTeam,
             };
             setUserProfile(updatedProfile);
             await AsyncStorage.setItem('@Auth:team', JSON.stringify(updatedTeam));
@@ -113,7 +115,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             {children}
         </AuthContext.Provider>
     );
-
 };
 
 export const useAuth = () => useContext(AuthContext);

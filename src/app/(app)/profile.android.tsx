@@ -1,11 +1,11 @@
 import React from 'react';
 import {
-    View,
-    Text,
     Image,
+    SafeAreaView,
     ScrollView,
     StyleSheet,
-    SafeAreaView,
+    Text,
+    View,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 

@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
+    ActivityIndicator,
     Image,
+    SafeAreaView,
     ScrollView,
     StyleSheet,
-    SafeAreaView,
+    Text,
     TouchableOpacity,
-    ActivityIndicator,
+    View,
 } from 'react-native';
+import type { Pokemon } from '../../@types/pokemon';
 import { useAuth } from '../../context/AuthContext';
 import { getPokemons } from '../../integration/pokemonIntegration';
-import type { Pokemon } from '../../@types/pokemon';
-import type { TeamPokemon } from '../../context/AuthContext';
 
 interface SelectablePokemon extends Pokemon {
     isSelected?: boolean;

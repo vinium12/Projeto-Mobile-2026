@@ -2,64 +2,215 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Alert } from '../../components/alert';
 import { Button } from '../../components/button';
-import { Card } from '../../components/card';
 import { Input } from '../../components/input';
 
+const API_URL = 'https://lnh1dhp1mj.execute-api.us-east-1.amazonaws.com/api-pokemon';
+
 export default function Index() {
-    const [name, setName] = useState<string>('');
-    const [senha, setSenha] = useState<string>('');
+    const [isRegister, setIsRegister] = useState(false);
+
+    // Login
+    const [loginName, setLoginName] = useState('');
+    const [loginSenha, setLoginSenha] = useState('');
+    const [loginLoading, setLoginLoading] = useState(false);
+
+    // Cadastro
+    const [regName, setRegName] = useState('');
+    const [regSenha, setRegSenha] = useState('');
+    const [regLoading, setRegLoading] = useState(false);
 
     const [isAlertVisible, setIsAlertVisible] = useState(false);
-    const [alertData, setAlertData] = useState({ 
-        title: '', 
+    const [alertData, setAlertData] = useState({
+        title: '',
         message: '',
         type: 'success' as 'success' | 'error' | 'warning' | 'info',
     });
 
     const { signIn } = useAuth();
 
-    function validateCredentials() {
-        if(name === 'kleber' && senha === '123') {
-            signIn(name);
-            router.push({ pathname: '/dashboard', params: { username: name } });
-        } else {
-            setAlertData({
-                title: 'Erro de Login',
-                message: 'Credenciais inválidas. Tente novamente.',
-                type: 'error',
+    function showAlert(title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') {
+        setAlertData({ title, message, type });
+        setIsAlertVisible(true);
+    }
+
+    async function handleLogin() {
+        if (!loginName || !loginSenha) {
+            showAlert('Campos obrigatórios', 'Preencha o usuário e a senha.', 'warning');
+            return;
+        }
+        setLoginLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/auth/v1/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: loginName, password: loginSenha }),
             });
-            setIsAlertVisible(true);
+            const data = await response.json();
+            if (response.ok) {
+                await signIn(loginName, data.userId);
+                router.push({ pathname: '/dashboard', params: { username: loginName } });
+            } else {
+                showAlert('Erro de Login', data.message || 'Credenciais inválidas.', 'error');
+            }
+        } catch {
+            showAlert('Erro de conexão', 'Não foi possível conectar ao servidor.', 'error');
+        } finally {
+            setLoginLoading(false);
+        }
+    }
+
+    async function handleRegister() {
+        if (!regName || !regSenha) {
+            showAlert('Campos obrigatórios', 'Preencha o usuário e a senha.', 'warning');
+            return;
+        }
+        setRegLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/auth/v1/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: regName, password: regSenha }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showAlert('Conta criada!', 'Cadastro realizado com sucesso. Faça login!', 'success');
+            } else {
+                showAlert('Erro no cadastro', data.message || 'Não foi possível criar a conta.', 'error');
+            }
+        } catch {
+            showAlert('Erro de conexão', 'Não foi possível conectar ao servidor.', 'error');
+        } finally {
+            setRegLoading(false);
         }
     }
 
     return (
         <View style={styles.container}>
+            <style>{`
+                .auth-wrapper {
+                    display: flex;
+                    flex: 1;
+                    width: 100%;
+                    height: 100%;
+                    position: relative;
+                    overflow: hidden;
+                }
 
-            <View style={styles.left}>
-                <Text style={styles.headerTitle}>Pokédex</Text>
-            </View>
+                /* Painel branco (formulários) */
+                .forms-panel {
+                    position: absolute;
+                    top: 0; bottom: 0;
+                    width: 50%;
+                    background: #F5F5F0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 48px;
+                    transition: left 0.7s cubic-bezier(0.77, 0, 0.18, 1);
+                    z-index: 1;
+                }
+                .forms-panel.login  { left: 50%; }
+                .forms-panel.register { left: 0%; }
 
-            <View style={styles.right}>
+                .red-panel {
+                    position: absolute;
+                    top: 0; bottom: 0;
+                    width: 50%;
+                    background: #CC0000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-direction: column;
+                    gap: 8px;
+                    transition: left 0.7s cubic-bezier(0.77, 0, 0.18, 1);
+                    z-index: 2;
+                }
+                .red-panel.login  { left: 0%; }
+                .red-panel.register { left: 50%; }
 
-                <Card>
-                    <View style={styles.loginForm}>
-                        <Input placeholder="Usuário" onChangeText={setName} />
-                        <Input placeholder="Senha" secureTextEntry onChangeText={setSenha} />
-                        <Button title="Entrar" onPress={validateCredentials} style={{ marginTop: 8 }} />
-                        <Text style={styles.register}>Não tem senha? Cadastre-se</Text> 
-                    </View>
-                </Card>
-            </View>
+                .panel-title {
+                    color: #fff;
+                    font-size: 52px;
+                    font-weight: bold;
+                    letter-spacing: 2px;
+                    font-family: serif;
+                }
+                .panel-sub {
+                    color: #ffcccc;
+                    font-size: 16px;
+                    margin-bottom: 24px;
+                }
+                .switch-btn {
+                    color: #fff;
+                    font-weight: bold;
+                    text-decoration: underline;
+                    cursor: pointer;
+                    font-size: 14px;
+                    background: none;
+                    border: none;
+                    font-family: inherit;
+                }
+                .form-box {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    width: 320px;
+                }
+                .link-text {
+                    color: #CC0000;
+                    text-decoration: none;
+                    cursor: pointer;
+                    text-align: center;
+                    font-size: 14px;
+                    background: none;
+                    border: none;
+                    zfontSize: 16,
+                    fontWeight: 'bold',
+                }
+            `}</style>
 
-            <Alert 
+            <div className="auth-wrapper">
+
+                <div className={`forms-panel ${isRegister ? 'register' : 'login'}`}>
+                    {!isRegister ? (
+                        <div className="form-box">
+                            <Input placeholder="Usuário" onChangeText={setLoginName} />
+                            <Input placeholder="Senha" secureTextEntry onChangeText={setLoginSenha} />
+                            <Button title={loginLoading ? 'Entrando...' : 'Entrar'} onPress={handleLogin} style={{ marginTop: 8 }} />
+                            <button className="link-text" onClick={() => setIsRegister(true)}>
+                                Não tem conta? Cadastre-se
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="form-box">
+                            <Input placeholder="Usuário" onChangeText={setRegName} />
+                            <Input placeholder="Senha" secureTextEntry onChangeText={setRegSenha} />
+                            <Button title={regLoading ? 'Cadastrando...' : 'Cadastrar'} onPress={handleRegister} style={{ marginTop: 8 }} />
+                            <button className="link-text" onClick={() => setIsRegister(false)}>
+                                Já tem conta? Faça login
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className={`red-panel ${isRegister ? 'register' : 'login'}`}>
+                    <span className="panel-title">Pokédex</span>
+                </div>
+
+            </div>
+
+            <Alert
                 title={alertData.title}
                 message={alertData.message}
                 type={alertData.type}
                 visible={isAlertVisible}
-                onClose={() => setIsAlertVisible(false)} />
+                onClose={() => {
+                    setIsAlertVisible(false);
+                    if (alertData.type === 'success') setIsRegister(false);
+                }} />
         </View>
     );
 }
@@ -70,47 +221,4 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         backgroundColor: '#CC0000',
     },
-
-    left: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        padding: 48,
-    },
-    headerTitle: {
-        color: '#fff',
-        fontSize: 52,
-        fontWeight: 'bold',
-        letterSpacing: 2,
-    },
-    headerSub: {
-        color: '#ffcccc',
-        fontSize: 16,
-    },
-
-    right: {
-        flex: 1,
-        backgroundColor: '#F5F5F0',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 48,
-        gap: 20,
-    },
-    formTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#222',
-        alignSelf: 'flex-start',
-    },
-    loginForm: {
-        gap: 12,
-        width: 360,
-    },
-    register:{
-        color: '#CC0000',
-        fontWeight: 'bold',
-        cursor: 'pointer',
-        textDecorationLine: 'underline'
-    }
 });
