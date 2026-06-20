@@ -1,16 +1,19 @@
 import React from 'react';
 import {
+    ActivityIndicator,
     Image,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 
+const DEFAULT_AVATAR = require('../../../assets/images/SemFoto.png');
+
 export default function ProfileScreen() {
-    const { userProfile } = useAuth();
+    const { userProfile, statsLoading } = useAuth();
 
     if (!userProfile) {
         return (
@@ -29,7 +32,7 @@ export default function ProfileScreen() {
             >
                 <View style={styles.header}>
                     <Image
-                        source={userProfile.image}
+                        source={userProfile.image ? { uri: userProfile.image } : DEFAULT_AVATAR}
                         style={styles.avatar}
                     />
                     <Text style={styles.name}>{userProfile.name}</Text>
@@ -37,23 +40,27 @@ export default function ProfileScreen() {
 
                 <View style={styles.boardContainer}>
                     <Text style={styles.boardTitle}>Estatísticas</Text>
-                    
-                    <View style={styles.statsGrid}>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{userProfile.victories}</Text>
-                            <Text style={styles.statLabel}>Vitórias</Text>
-                        </View>
 
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{userProfile.defeats}</Text>
-                            <Text style={styles.statLabel}>Derrotas</Text>
-                        </View>
+                    {statsLoading ? (
+                        <ActivityIndicator size="large" color="#CC0000" style={{ marginTop: 20 }} />
+                    ) : (
+                        <View style={styles.statsGrid}>
+                            <View style={styles.statCard}>
+                                <Text style={styles.statValue}>{userProfile.victories}</Text>
+                                <Text style={styles.statLabel}>Vitórias</Text>
+                            </View>
 
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{userProfile.matches}</Text>
-                            <Text style={styles.statLabel}>Partidas</Text>
+                            <View style={styles.statCard}>
+                                <Text style={styles.statValue}>{userProfile.defeats}</Text>
+                                <Text style={styles.statLabel}>Derrotas</Text>
+                            </View>
+
+                            <View style={styles.statCard}>
+                                <Text style={styles.statValue}>{userProfile.matches}</Text>
+                                <Text style={styles.statLabel}>Partidas</Text>
+                            </View>
                         </View>
-                    </View>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -79,6 +86,7 @@ const styles = StyleSheet.create({
         borderColor: '#FFF',
         marginBottom: 15,
         backgroundColor: '#FFF',
+        elevation: 4,
     },
     name: {
         fontSize: 24,
@@ -107,16 +115,16 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: 110,
         backgroundColor: '#FFF',
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 20,
         alignItems: 'center',
         borderLeftWidth: 4,
         borderLeftColor: '#CC0000',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 6,
     },
     statValue: {
         fontSize: 32,
@@ -127,7 +135,9 @@ const styles = StyleSheet.create({
     statLabel: {
         fontSize: 14,
         color: '#666',
-        fontWeight: '500',
+        fontWeight: '600',
         textAlign: 'center',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
     },
 });

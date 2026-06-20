@@ -1,61 +1,84 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Pokemon } from '../../@types/pokemon';
 import { useAuth } from '../../context/AuthContext';
-import { getPokemons } from '../../integration/pokemonIntegration';
-
-interface SelectablePokemon extends Pokemon {
-    isSelected?: boolean;
-}
+import { getTeam, updateTeam } from '../../integration/teamIntegration';
 
 export default function TeamScreen() {
-    const { userProfile, addToTeam, removeFromTeam } = useAuth();
-    const [availablePokemons, setAvailablePokemons] = useState<SelectablePokemon[]>([]);
+    const { userProfile } = useAuth();
+    const [team, setTeam] = useState<Pokemon[]>([]);
+    const [captured, setCaptured] = useState<Pokemon[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const loadTeam = useCallback(async () => {
+        if (!userProfile) return;
+        try {
+            const { team: teamData, capture } = await getTeam(userProfile.id);
+            setTeam(teamData);
+            // Filtra capturados que já estão no time
+            const teamIndexes = new Set(teamData.map((p: Pokemon) => p.index));
+            setCaptured(capture.filter((p: Pokemon) => !teamIndexes.has(p.index)));
+        } catch (err) {
+            console.error('Erro ao carregar time:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [userProfile]);
 
     useEffect(() => {
-        const loadPokemons = async () => {
-            try {
-                const data = await getPokemons(151);
-                // Embaralha e pega 25 aleatórios
-                const shuffled = data.sort(() => Math.random() - 0.5).slice(0, 25);
-                setAvailablePokemons(shuffled);
-                setLoading(false);
-            } catch (err) {
-                console.error('Erro ao carregar pokémons:', err);
-                setLoading(false);
-            }
-        };
+        loadTeam();
+    }, [loadTeam]);
 
-        loadPokemons();
-    }, []);
-
-    const isInTeam = (pokemonId: string) => {
-        return userProfile?.team.some(p => p.index === pokemonId);
+    const isInTeam = (pokemonIndex: string) => {
+        return team.some(p => p.index === pokemonIndex);
     };
 
-    const handleAddToTeam = (pokemon: SelectablePokemon) => {
-        if (!isInTeam(pokemon.index) && userProfile && userProfile.team.length < 5) {
-            addToTeam({
-                id: `${pokemon.index}-${Date.now()}`,
-                index: pokemon.index,
-                nome: pokemon.nome,
-                imagem: pokemon.imagem,
-            });
+    const handleAddToTeam = async (pokemon: Pokemon) => {
+        if (!userProfile || isInTeam(pokemon.index) || team.length >= 5) return;
+
+        const previousTeam = [...team];
+        const previousCaptured = [...captured];
+        setTeam(prev => [...prev, pokemon]);
+        setCaptured(prev => prev.filter(p => p.index !== pokemon.index));
+        setSaving(true);
+        try {
+            await updateTeam(userProfile.id, null, undefined, pokemon.index);
+        } catch (err) {
+            console.error('Erro ao adicionar ao time:', err);
+            setTeam(previousTeam);
+            setCaptured(previousCaptured);
+        } finally {
+            setSaving(false);
         }
     };
 
-    const handleRemoveFromTeam = (pokemonId: string) => {
-        removeFromTeam(pokemonId);
+    const handleRemoveFromTeam = async (pokemon: Pokemon) => {
+        if (!userProfile) return;
+
+        const previousTeam = [...team];
+        const previousCaptured = [...captured];
+        setTeam(prev => prev.filter(p => p.index !== pokemon.index));
+        setCaptured(prev => [...prev, pokemon]);
+        setSaving(true);
+        try {
+            await updateTeam(userProfile.id, null, pokemon.index, undefined);
+        } catch (err) {
+            console.error('Erro ao remover do time:', err);
+            setTeam(previousTeam);
+            setCaptured(previousCaptured);
+        } finally {
+            setSaving(false);
+        }
     };
 
     if (loading) {
@@ -68,77 +91,82 @@ export default function TeamScreen() {
         );
     }
 
-    const teamSize = userProfile?.team.length || 0;
+    const teamSize = team.length;
     const emptySlots = 5 - teamSize;
 
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Meu Time ({teamSize}/5)</Text>
-                    
+                    <View style={styles.headerTitleRow}>
+                        <Text style={styles.headerTitle}>Meu Time</Text>
+                        {saving && <ActivityIndicator size="small" color="#FFF" />}
+                    </View>
+                    <Text style={styles.slotInfo}>{teamSize} / 5 Pokémons selecionados</Text>
+
                     <View style={styles.slotContainer}>
-                        {/* Pokémons no time */}
-                        {userProfile?.team.map((pokemon, index) => (
-                            <View key={pokemon.id} style={[styles.slot, styles.slotFilled]}>
+                        {team.map((pokemon) => (
+                            <View key={pokemon.index} style={styles.slotWrapper}>
                                 <TouchableOpacity
                                     style={styles.removeButton}
-                                    onPress={() => handleRemoveFromTeam(pokemon.id)}
+                                    onPress={() => handleRemoveFromTeam(pokemon)}
+                                    activeOpacity={0.7}
                                 >
                                     <Text style={styles.removeButtonText}>✕</Text>
                                 </TouchableOpacity>
-                                <Image
-                                    source={{ uri: pokemon.imagem }}
-                                    style={styles.slotImage}
-                                    resizeMode="contain"
-                                />
-                                <Text style={styles.slotText}>{pokemon.nome.substring(0, 8)}</Text>
+                                <View style={[styles.slot, styles.slotFilled]}>
+                                    <Image
+                                        source={{ uri: pokemon.imagem }}
+                                        style={styles.slotImage}
+                                        resizeMode="contain"
+                                    />
+                                    <Text style={styles.slotText}>{pokemon.nome.substring(0, 8)}</Text>
+                                </View>
                             </View>
                         ))}
-                        
-                        {/* Slots vazios */}
+
                         {Array.from({ length: emptySlots }).map((_, index) => (
-                            <View key={`empty-${index}`} style={styles.slot}>
-                                <Text style={styles.slotText}>+</Text>
+                            <View key={`empty-${index}`} style={styles.slotWrapper}>
+                                <View style={styles.slot}>
+                                    <Text style={[styles.slotText, { fontSize: 26, color: 'rgba(255, 255, 255, 0.6)' }]}>+</Text>
+                                </View>
                             </View>
                         ))}
                     </View>
                 </View>
 
                 <View style={styles.content}>
-                    <Text style={styles.sectionTitle}>Pokémons Disponíveis (25)</Text>
-                    
-                    <View style={styles.gridContainer}>
-                        {availablePokemons.map((pokemon) => {
-                            const inTeam = isInTeam(pokemon.index);
-                            return (
-                                <View
-                                    key={pokemon.index}
-                                    style={[styles.pokemonCard, inTeam && styles.pokemonCardSelected]}
-                                >
+                    <Text style={styles.sectionTitle}>Pokémons Capturados ({captured.length})</Text>
+
+                    {captured.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyStateText}>
+                                Você ainda não capturou nenhum Pokémon.{'\n'}Vença batalhas para capturar novos Pokémons!
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.gridContainer}>
+                            {captured.map((pokemon) => (
+                                <View key={pokemon.index} style={styles.pokemonCard}>
                                     <Image
                                         source={{ uri: pokemon.imagem }}
                                         style={styles.pokemonImage}
                                         resizeMode="contain"
                                     />
                                     <Text style={styles.pokemonName}>{pokemon.nome.substring(0, 10)}</Text>
-                                    
+
                                     <TouchableOpacity
-                                        style={[
-                                            styles.addButton,
-                                            (inTeam || teamSize >= 5) && styles.disabledButton
-                                        ]}
-                                        disabled={inTeam || teamSize >= 5}
+                                        style={[styles.addButton, teamSize >= 5 && styles.disabledButton]}
+                                        disabled={teamSize >= 5}
                                         onPress={() => handleAddToTeam(pokemon)}
+                                        activeOpacity={0.7}
                                     >
-                                        <Text style={styles.addButtonText}>
-                                            {inTeam ? '✓' : '+'}
-                                        </Text>
+                                        <Text style={styles.addButtonText}>+ Adicionar</Text>
                                     </TouchableOpacity>
                                 </View>
-                            );
-                        })}
-                    </View>
+                            ))}
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -155,24 +183,41 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
         paddingHorizontal: 20,
     },
+    headerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
         color: '#FFF',
-        marginBottom: 15,
+        letterSpacing: 0.2,
+    },
+    slotInfo: {
+        color: 'rgba(255, 255, 255, 0.85)',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
     },
     slotContainer: {
         flexDirection: 'row',
         gap: 10,
-        marginBottom: 10,
         flexWrap: 'wrap',
+        marginTop: 16,
     },
-    slot: {
+    slotWrapper: {
+        position: 'relative',
+        paddingTop: 10,
         flex: 1,
         minWidth: '18%',
+    },
+    slot: {
         height: 80,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
@@ -180,32 +225,39 @@ const styles = StyleSheet.create({
     },
     slotFilled: {
         borderColor: '#FFF',
+        elevation: 3,
     },
     slotImage: {
-        width: 60,
-        height: 60,
+        width: 56,
+        height: 56,
     },
     slotText: {
         color: '#FFF',
-        fontSize: 11,
-        marginTop: 5,
+        fontSize: 10,
+        marginTop: 4,
         textAlign: 'center',
+        fontWeight: '600',
     },
     removeButton: {
         position: 'absolute',
-        top: 2,
-        right: 2,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        borderRadius: 12,
-        width: 20,
-        height: 20,
+        top: 0,
+        right: -4,
+        backgroundColor: '#CC0000',
+        borderRadius: 14,
+        width: 22,
+        height: 22,
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 10,
+        borderWidth: 2,
+        borderColor: '#FFF',
+        elevation: 4,
     },
     removeButtonText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
+        lineHeight: 12,
     },
     content: {
         flex: 1,
@@ -214,9 +266,20 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#333',
         marginBottom: 15,
+    },
+    emptyState: {
+        paddingVertical: 30,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+    },
+    emptyStateText: {
+        fontSize: 14,
+        color: '#888',
+        textAlign: 'center',
+        lineHeight: 20,
     },
     gridContainer: {
         flexDirection: 'row',
@@ -226,18 +289,18 @@ const styles = StyleSheet.create({
     pokemonCard: {
         width: '31%',
         backgroundColor: '#FFF',
-        borderRadius: 10,
+        borderRadius: 16,
         marginBottom: 10,
         paddingVertical: 10,
         paddingHorizontal: 8,
         alignItems: 'center',
-        borderWidth: 2,
-        borderColor: 'transparent',
-        elevation: 2,
-    },
-    pokemonCardSelected: {
-        borderColor: '#CC0000',
-        borderWidth: 3,
+        borderLeftWidth: 3,
+        borderLeftColor: '#CC0000',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
     },
     pokemonImage: {
         width: 50,
@@ -255,13 +318,15 @@ const styles = StyleSheet.create({
         backgroundColor: '#CC0000',
         paddingVertical: 6,
         paddingHorizontal: 10,
-        borderRadius: 6,
+        borderRadius: 8,
         alignSelf: 'center',
     },
     addButtonText: {
         color: '#FFF',
         fontSize: 10,
         fontWeight: 'bold',
+        textTransform: 'uppercase',
+        letterSpacing: 0.2,
     },
     disabledButton: {
         backgroundColor: '#CCC',

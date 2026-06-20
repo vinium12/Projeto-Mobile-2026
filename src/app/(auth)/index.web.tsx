@@ -7,8 +7,6 @@ import { Alert } from '../../components/alert';
 import { Button } from '../../components/button';
 import { Input } from '../../components/input';
 
-const API_URL = 'https://lnh1dhp1mj.execute-api.us-east-1.amazonaws.com/api-pokemon';
-
 export default function Index() {
     const [isRegister, setIsRegister] = useState(false);
 
@@ -29,7 +27,7 @@ export default function Index() {
         type: 'success' as 'success' | 'error' | 'warning' | 'info',
     });
 
-    const { signIn } = useAuth();
+    const { signIn, signUp } = useAuth();
 
     function showAlert(title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') {
         setAlertData({ title, message, type });
@@ -43,17 +41,11 @@ export default function Index() {
         }
         setLoginLoading(true);
         try {
-            const response = await fetch(`${API_URL}/auth/v1/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: loginName, password: loginSenha }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                await signIn(loginName, data.userId);
+            const result = await signIn(loginName, loginSenha);
+            if (result.ok) {
                 router.push({ pathname: '/dashboard', params: { username: loginName } });
             } else {
-                showAlert('Erro de Login', data.message || 'Credenciais inválidas.', 'error');
+                showAlert('Erro de Login', result.error || 'Credenciais inválidas.', 'error');
             }
         } catch {
             showAlert('Erro de conexão', 'Não foi possível conectar ao servidor.', 'error');
@@ -69,16 +61,11 @@ export default function Index() {
         }
         setRegLoading(true);
         try {
-            const response = await fetch(`${API_URL}/auth/v1/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: regName, password: regSenha }),
-            });
-            const data = await response.json();
-            if (response.ok) {
+            const result = await signUp(regName, regSenha);
+            if (result.ok) {
                 showAlert('Conta criada!', 'Cadastro realizado com sucesso. Faça login!', 'success');
             } else {
-                showAlert('Erro no cadastro', data.message || 'Não foi possível criar a conta.', 'error');
+                showAlert('Erro no cadastro', result.error || 'Não foi possível criar a conta.', 'error');
             }
         } catch {
             showAlert('Erro de conexão', 'Não foi possível conectar ao servidor.', 'error');
@@ -177,8 +164,27 @@ export default function Index() {
                 <div className={`forms-panel ${isRegister ? 'register' : 'login'}`}>
                     {!isRegister ? (
                         <div className="form-box">
-                            <Input placeholder="Usuário" onChangeText={setLoginName} />
-                            <Input placeholder="Senha" secureTextEntry onChangeText={setLoginSenha} />
+                            <Input
+                                value={loginName}
+                                placeholder="Usuário"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                autoComplete="off"
+                                textContentType="none"
+                                spellCheck={false}
+                                onChangeText={setLoginName}
+                            />
+                            <Input
+                                value={loginSenha}
+                                placeholder="Senha"
+                                secureTextEntry
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                autoComplete="off"
+                                textContentType="password"
+                                spellCheck={false}
+                                onChangeText={setLoginSenha}
+                            />
                             <Button title={loginLoading ? 'Entrando...' : 'Entrar'} onPress={handleLogin} style={{ marginTop: 8 }} />
                             <button className="link-text" onClick={() => setIsRegister(true)}>
                                 Não tem conta? Cadastre-se
@@ -186,8 +192,27 @@ export default function Index() {
                         </div>
                     ) : (
                         <div className="form-box">
-                            <Input placeholder="Usuário" onChangeText={setRegName} />
-                            <Input placeholder="Senha" secureTextEntry onChangeText={setRegSenha} />
+                            <Input
+                                value={regName}
+                                placeholder="Usuário"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                autoComplete="off"
+                                textContentType="none"
+                                spellCheck={false}
+                                onChangeText={setRegName}
+                            />
+                            <Input
+                                value={regSenha}
+                                placeholder="Senha"
+                                secureTextEntry
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                autoComplete="off"
+                                textContentType="password"
+                                spellCheck={false}
+                                onChangeText={setRegSenha}
+                            />
                             <Button title={regLoading ? 'Cadastrando...' : 'Cadastrar'} onPress={handleRegister} style={{ marginTop: 8 }} />
                             <button className="link-text" onClick={() => setIsRegister(false)}>
                                 Já tem conta? Faça login
