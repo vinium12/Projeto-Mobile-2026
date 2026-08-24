@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { getStats, login as loginApi, register as registerApi } from "../integration/authIntegration";
+import { getStats, login as loginApi, register as registerApi, RegisterRequest } from "../integration/authIntegration";
+import { decodeToken, isTokenExpired } from "../utils/jwt";
 
 export type TeamPokemon = {
     id: string;
@@ -22,12 +23,13 @@ export type UserProfile = {
 type AuthContextData = {
     isAuthenticated: boolean;
     user: string | null;
+    roles: string[];
     token: string | null;
     userProfile: UserProfile | null;
     isLoading: boolean;
     statsLoading: boolean;
     signIn: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-    signUp: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+    signUp: (data: RegisterRequest) => Promise<{ ok: boolean; error?: string }>;
     signOut: () => void;
     refreshStats: () => Promise<void>;
     addToTeam: (pokemon: TeamPokemon) => void;
@@ -40,6 +42,7 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [user, setUser] = useState<string | null>(null);
+    const [roles, setRoles] = useState<string[]>([]);
     const [token, setToken] = useState<string | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -60,33 +63,78 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .finally(() => setStatsLoading(false));
     }
 
+    async function persistSession(newToken: string) {
+        const payload = decodeToken(newToken);
+        if (!payload) {
+            await clearSession();
+            return;
+        }
+
+        const username = payload.sub;
+        const userRoles = payload.roles || [];
+        
+        setUser(username);
+        setRoles(userRoles);
+        setToken(newToken);
+        setIsAuthenticated(true);
+
+        await AsyncStorage.setItem('@Auth:user', username);
+        await AsyncStorage.setItem('@Auth:token', newToken);
+        await AsyncStorage.setItem('@Auth:roles', JSON.stringify(userRoles));
+        
+        // Simular um userId usando o username temporariamente até a API prover um ID fixo ou usarmos apenas username
+        await AsyncStorage.setItem('@Auth:userId', username);
+
+        // Inicializar profile básico
+        const savedAvatar = await AsyncStorage.getItem(`@Auth:avatar:${username}`);
+        const storageTeam = await AsyncStorage.getItem('@Auth:team');
+        const team = storageTeam ? JSON.parse(storageTeam) : [];
+
+        setUserProfile({
+            id: username,
+            name: username,
+            image: savedAvatar ?? null,
+            victories: 0,
+            defeats: 0,
+            matches: 0,
+            team,
+        });
+
+        // Buscar stats reais
+        fetchStats(username);
+    }
+
+    async function clearSession() {
+        setUser(null);
+        setRoles([]);
+        setToken(null);
+        setUserProfile(null);
+        setIsAuthenticated(false);
+        await AsyncStorage.removeItem('@Auth:user');
+        await AsyncStorage.removeItem('@Auth:userId');
+        await AsyncStorage.removeItem('@Auth:token');
+        await AsyncStorage.removeItem('@Auth:roles');
+        await AsyncStorage.removeItem('@Auth:team');
+    }
+
     useEffect(() => {
         async function loadStorageData() {
-            const storageUser = await AsyncStorage.getItem('@Auth:user');
-            const storageUserId = await AsyncStorage.getItem('@Auth:userId');
-            const storageToken = await AsyncStorage.getItem('@Auth:token');
-            const storageTeam = await AsyncStorage.getItem('@Auth:team');
-            const storageAvatar = storageUserId
-                ? await AsyncStorage.getItem(`@Auth:avatar:${storageUserId}`)
-                : null;
-
-            if (storageUser && storageUserId && storageToken) {
-                const team = storageTeam ? JSON.parse(storageTeam) : [];
-                setUser(storageUser);
-                setToken(storageToken);
-                setUserProfile({
-                    id: storageUserId,
-                    name: storageUser,
-                    image: storageAvatar ?? null,
-                    victories: 0,
-                    defeats: 0,
-                    matches: 0,
-                    team,
-                });
-                setIsAuthenticated(true);
-                fetchStats(storageUserId);
+            try {
+                const storageToken = await AsyncStorage.getItem('@Auth:token');
+                if (storageToken) {
+                    const payload = decodeToken(storageToken);
+                    if (payload && !isTokenExpired(payload.exp)) {
+                        await persistSession(storageToken);
+                    } else {
+                        await clearSession();
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao ler token", e);
+                await clearSession();
+            } finally {
+                setIsLoading(false);
             }
-            setIsLoading(false);
         }
         loadStorageData();
     }, []);
@@ -94,43 +142,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     async function signIn(username: string, password: string): Promise<{ ok: boolean; error?: string }> {
         try {
             const response = await loginApi({ username, password });
-
-            const cleanUsername = username.trim();
-            const savedAvatar = await AsyncStorage.getItem(`@Auth:avatar:${response.userId}`);
-
-            setUser(cleanUsername);
-            setToken(response.token ?? null);
-            setIsAuthenticated(true);
-            setUserProfile({
-                id: response.userId,
-                name: cleanUsername,
-                image: savedAvatar ?? null,
-                victories: 0,
-                defeats: 0,
-                matches: 0,
-                team: [],
-            });
-
-            await AsyncStorage.setItem('@Auth:user', cleanUsername);
-            await AsyncStorage.setItem('@Auth:userId', response.userId);
+            
             if (response.token) {
-                await AsyncStorage.setItem('@Auth:token', response.token);
+                await persistSession(response.token);
+                return { ok: true };
             } else {
-                console.warn('[signIn] Backend não retornou token no login. Verificar rota /auth/v1/login.');
+                return { ok: false, error: 'Token não recebido' };
             }
-
-            fetchStats(response.userId);
-
-            return { ok: true };
         } catch (err: any) {
             const message = err?.response?.data?.message ?? 'Nome ou senha incorretos.';
             return { ok: false, error: message };
         }
     }
 
-    async function signUp(username: string, password: string): Promise<{ ok: boolean; error?: string }> {
+    async function signUp(data: RegisterRequest): Promise<{ ok: boolean; error?: string }> {
         try {
-            await registerApi({ username, password });
+            await registerApi(data);
             return { ok: true };
         } catch (err: any) {
             const message = err?.response?.data?.message ?? 'Não foi possível criar a conta.';
@@ -144,14 +171,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     async function signOut() {
-        setUser(null);
-        setToken(null);
-        setUserProfile(null);
-        setIsAuthenticated(false);
-        await AsyncStorage.removeItem('@Auth:user');
-        await AsyncStorage.removeItem('@Auth:userId');
-        await AsyncStorage.removeItem('@Auth:token');
-        await AsyncStorage.removeItem('@Auth:team');
+        await clearSession();
     }
 
     async function addToTeam(pokemon: TeamPokemon) {
@@ -184,7 +204,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, user, token, userProfile, signIn, signUp, signOut, isLoading, statsLoading, refreshStats, addToTeam, removeFromTeam, updateAvatar }}>
+        <AuthContext.Provider value={{ isAuthenticated, user, roles, token, userProfile, signIn, signUp, signOut, isLoading, statsLoading, refreshStats, addToTeam, removeFromTeam, updateAvatar }}>
             {children}
         </AuthContext.Provider>
     );

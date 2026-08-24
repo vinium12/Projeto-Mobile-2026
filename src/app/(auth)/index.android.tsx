@@ -79,7 +79,13 @@ export default function Index() {
         }
         setRegLoading(true);
         try {
-            const result = await signUp(regName, regSenha);
+            const result = await signUp({
+                username: regName,
+                password: regSenha,
+                email: `${regName}@email.com`,
+                cpf: '00000000000',
+                roles: ['USER']
+            });
             if (result.ok) {
                 showAlert('Conta criada!', 'Cadastro realizado com sucesso. Faça login!', 'success');
             } else {
